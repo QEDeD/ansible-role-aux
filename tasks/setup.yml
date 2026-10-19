@@ -13,6 +13,7 @@
     group: "{{ item.group | default(aux_directory_default_group) }}"
     mode: "{{ item.mode | default(aux_directory_default_mode) }}"
   with_items: "{{ aux_directory_definitions }}"
+  register: aux_directory_results
 
 - name: Ensure AUX files are created
   ansible.builtin.copy:
@@ -25,6 +26,19 @@
   with_items: "{{ aux_file_definitions }}"
   loop_control:
     label: "{{ item.dest }}"
+  register: aux_file_results
+
+# Lets a playbook restart the services that read these files and directories,
+# but only when this run changed them (see `aux_changed_definitions`).
+- name: Determine which AUX directories and files changed
+  ansible.builtin.set_fact:
+    aux_changed_definitions: >-
+      {{
+        (aux_directory_results.results + aux_file_results.results)
+        | selectattr('changed') | map(attribute='item')
+        | map('dict2items') | map('rejectattr', 'key', 'equalto', 'content') | map('items2dict')
+        | list
+      }}
 
 - name: Ensure AUX packages are installed
   ansible.builtin.package:

@@ -106,6 +106,17 @@ aux_file_definitions_auto: []
 # this var is cumulative of `aux_file_definitions_custom` and `aux_file_definitions_auto`
 aux_file_definitions: "{{ aux_file_definitions_auto + aux_file_definitions_custom }}"
 
+# Holds the entries of `aux_directory_definitions` and `aux_file_definitions` that the
+# current run created or changed, without their `content` key; in check mode, those it would change.
+# The role sets it whenever its setup tasks run (tags `setup-all`, `setup-aux`, `install-all` and
+# `install-aux`). Until then, and in runs that skip those tasks, it is an empty list.
+#
+# A playbook can use this to restart the services that read these directories and files,
+# so that they pick up a change without restarting on every run.
+# An entry may carry extra keys besides those this role uses; they are passed through
+# unchanged, so a playbook can, for example, let an entry name the services to restart.
+aux_changed_definitions: []
+
 # The state when installing packages using `aux_package_definitions`
 aux_package_state: present
 

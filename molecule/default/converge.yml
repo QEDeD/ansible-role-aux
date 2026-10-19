@@ -12,3 +12,27 @@
     - name: Include the aux role
       ansible.builtin.include_role:
         name: "{{ lookup('env', 'MOLECULE_PROJECT_DIRECTORY') | basename }}"
+
+    # `aux_changed_definitions` is a fact and does not survive into verify.yml,
+    # so it is kept here and written to a file below.
+    - name: Keep the changed definitions of the first run
+      ansible.builtin.set_fact:
+        aux_molecule_changed_first_run: "{{ aux_changed_definitions }}"
+
+    # The same directories and files again, which are now all in their
+    # configured state. Packages and commands are left out, so that the commands
+    # do not run a second time.
+    - name: Include the aux role a second time, for directories and files only
+      ansible.builtin.include_role:
+        name: "{{ lookup('env', 'MOLECULE_PROJECT_DIRECTORY') | basename }}"
+      vars:
+        aux_package_definitions: []
+        aux_command_definitions: []
+
+    - name: Record the changed definitions of both runs for verify.yml
+      ansible.builtin.copy:
+        dest: "{{ aux_molecule_base_path }}/changed-definitions.json"
+        content: "{{ {'first_run': aux_molecule_changed_first_run, 'second_run': aux_changed_definitions} | to_nice_json }}\n"
+        owner: root
+        group: root
+        mode: "0644"

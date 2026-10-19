@@ -59,7 +59,7 @@ Both ways of feeding the role are exercised too: directories and files are split
 
 - **Non-Debian hosts.** Both distributions in the CI matrix are Debian-family, so `aux_package_definitions` is only ever exercised through apt. The role uses `ansible.builtin.package`, which picks the host's package manager itself.
 - **`aux_package_state`.** Left at the role's default of `present`. Asserting `latest` would mean upgrading whatever the distribution has published since the test image was built.
-- **Idempotence.** The scenario leaves the `idempotence` step out of its sequence. `aux_command_definitions` is a list of unconditional commands — one of which is expected to fail every time — so the role reports changes on every run by design.
+- **Idempotence.** The scenario leaves the `idempotence` step out of its sequence. `aux_command_definitions` is a list of unconditional commands — one of which is expected to fail every time — so the role reports changes on every run by design. The directory and file tasks are covered instead by a second run of the role in the converge, without packages and commands: it must leave `aux_changed_definitions` empty.
 - **`aux_command_default_become` being set to `true`.** The connection user in the test container is already `root`, so a command that becomes root is indistinguishable from one that does not. The distinction is made the other way round instead: one command becomes an *unprivileged* user and its marker file comes out owned by that user.
 
 ## Scenarios
@@ -68,9 +68,11 @@ Currently these testing scenarios are available:
 
 ### `default`
 
-Everything the role does to a host, in one converge.
+Everything the role does to a host, in one converge that runs the role twice: first with every definition, then again for directories and files only.
 
 It asserts that both halves of `aux_directory_definitions` were applied and that per-item `mode`, `owner` and `group` beat the defaults; that files are rendered with the content they were given byte for byte, at the permissions this role ships, and that an existing file with the wrong content and the wrong permissions is corrected; that a file defined with `src` rather than `content` arrives byte-identical to the fixture on the Ansible controller — the fixture is binary, opening with a NUL byte, because `defaults/main.yml` documents `src` as the way to place content that `content` cannot carry; that the package named in `aux_package_definitions` is installed and its program runs; and that a command with `become_user` really ran as that user, while a command that names no `become` did not.
+
+It also asserts what `aux_changed_definitions` reports. After the first run it lists exactly the directory and file definitions whose target the role created or changed, and not `already-configured`, which `prepare.yml` creates in its configured state. The listed definitions carry no `content` but keep their other keys, including `src` and a key the role does not use. After the second run, which changes nothing, it is empty.
 
 One command in the scenario is deliberately broken. It removes a file that exists and one that does not, so it does its work and still exits non-zero. The converge surviving it is what proves `ignore_errors` is honored per item, and the removed file being gone afterwards is what proves the command ran at all.
 

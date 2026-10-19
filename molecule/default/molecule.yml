@@ -72,6 +72,11 @@ provisioner:
             owner: root
             group: root
 
+          # prepare.yml creates this one already in the configured state, so the
+          # role has nothing to change. It is the entry that must be missing
+          # from `aux_changed_definitions` (see verify.yml).
+          - dest: /var/lib/molecule-aux/already-configured
+
         # ------------------------------------------------------------------
         # Files
         #
@@ -99,6 +104,10 @@ provisioner:
             mode: "0604"
             owner: aux-molecule-user
             group: aux-molecule-group
+            # Not used by the role. A playbook may add keys like this one, and
+            # `aux_changed_definitions` has to pass them through unchanged.
+            restart_services:
+              - example.service
 
           # The other half of the file task: content taken from a file on the
           # Ansible controller rather than from a string. `defaults/main.yml`

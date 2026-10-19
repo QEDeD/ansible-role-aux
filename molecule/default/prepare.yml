@@ -37,6 +37,17 @@
         group: root
         mode: "0777"
 
+    # The opposite: a directory the role is told about that already has the
+    # configured owner, group and mode. The role leaves it as it is, so it must
+    # not appear in `aux_changed_definitions`.
+    - name: Ensure one of the role's directories exists, already in the configured state
+      ansible.builtin.file:
+        path: "{{ aux_molecule_base_path }}/already-configured"
+        state: directory
+        owner: "{{ aux_directory_default_owner }}"
+        group: "{{ aux_directory_default_group }}"
+        mode: "{{ aux_directory_default_mode }}"
+
     # Same idea for a file the role is about to render: it already exists, with
     # content the role did not write and a mode the role did not ask for.
     - name: Ensure one of the role's files exists, in the wrong state

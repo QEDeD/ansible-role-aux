@@ -297,6 +297,69 @@
         success_msg: "A failing command with `ignore_errors` did not stop the definitions after it"
 
     # ------------------------------------------------------------------
+    # Changed definitions
+    # ------------------------------------------------------------------
+
+    # Written by converge.yml from `aux_changed_definitions`, once after each
+    # of its two runs of the role.
+    - name: Read the changed definitions converge.yml recorded
+      ansible.builtin.slurp:
+        src: "{{ aux_molecule_base_path }}/changed-definitions.json"
+      register: aux_verify_changed_slurped
+
+    - name: Parse the changed definitions
+      ansible.builtin.set_fact:
+        aux_verify_changed: "{{ aux_verify_changed_slurped.content | b64decode | from_json }}"
+
+    # prepare.yml left every directory and file in the wrong state or missing,
+    # except `already-configured`, so that is the one entry the first run must
+    # leave out.
+    - name: Assert the first run lists exactly the directories and files it created or changed
+      ansible.builtin.assert:
+        that:
+          - >-
+            aux_verify_changed.first_run | map(attribute='dest') | list == [
+              aux_molecule_base_path,
+              aux_molecule_base_path + '/from-custom',
+              aux_molecule_base_path + '/explicit',
+              aux_molecule_base_path + '/from-auto.txt',
+              aux_molecule_base_path + '/from-custom.txt',
+              aux_molecule_base_path + '/explicit.txt',
+              aux_molecule_base_path + '/binary.dat',
+            ]
+        fail_msg: >-
+          The first run listed {{ aux_verify_changed.first_run | map(attribute='dest') | list }} as
+          changed. It should list every definition except `already-configured`, which prepare.yml
+          created in its configured state.
+        success_msg: "The first run listed every changed definition and left out the unchanged one"
+
+    # `explicit.txt` carries a key the role does not use, and `binary.dat` one
+    # (`src`) that the file task uses besides `content`.
+    - name: Assert the changed entries keep their keys except `content`
+      ansible.builtin.assert:
+        that:
+          - aux_verify_changed.first_run | selectattr('content', 'defined') | list == []
+          - >-
+            (aux_verify_changed.first_run | selectattr('dest', 'equalto', aux_molecule_base_path + '/explicit.txt') | first)
+            == {'dest': aux_molecule_base_path + '/explicit.txt', 'mode': '0604', 'owner': aux_molecule_user,
+                'group': aux_molecule_group, 'restart_services': ['example.service']}
+          - >-
+            (aux_verify_changed.first_run | selectattr('dest', 'equalto', aux_molecule_base_path + '/binary.dat') | first).src
+            == lookup('env', 'MOLECULE_SCENARIO_DIRECTORY') + '/files/binary.dat'
+        fail_msg: >-
+          An entry in `aux_changed_definitions` still carries file content, or lost one of the
+          other keys of its definition
+        success_msg: "The changed entries carry their definitions without `content`"
+
+    - name: Assert a run that changes nothing lists nothing
+      ansible.builtin.assert:
+        that: aux_verify_changed.second_run == []
+        fail_msg: >-
+          The second run, which found every directory and file in its configured state, listed
+          {{ aux_verify_changed.second_run | map(attribute='dest') | list }} as changed
+        success_msg: "A run that changed no directory or file left `aux_changed_definitions` empty"
+
+    # ------------------------------------------------------------------
     # Negative controls
     # ------------------------------------------------------------------
 
